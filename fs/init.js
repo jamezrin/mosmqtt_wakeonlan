@@ -20,7 +20,7 @@ Timer.set(1000 /* 1 sec */, Timer.REPEAT, function() {
 
 MQTT.sub('SendWol', function(conn, topic, msg) {
   let data = JSON.parse(msg);
-  print("Waking up:", data)
+  print("Waking up:", data.mac);
   
   let packet = "\xff\xff\xff\xff\xff\xff";
   let target = unhexlify(data.mac);

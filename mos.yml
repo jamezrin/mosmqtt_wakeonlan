@@ -10,12 +10,16 @@ mongoose_os_version: ${mos.version}
 config_schema:
   - ["i2c.enable", true]
   - ["mqtt.enable", true]
+  - ["http.enable", false]
   - ["mqtt.server", "broker.losant.com:8883"]
   - ["mqtt.ssl_ca_cert", "ca.pem"]
 
 tags:
   - js
-  
+  - c
+  - wol
+  - mqtt
+
 sources:
   - src
 
