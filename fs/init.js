@@ -1,18 +1,14 @@
 load('api_config.js');
 load('api_events.js');
-load('api_gpio.js');
 load('api_mqtt.js');
 load('api_net.js');
 load('api_sys.js');
 load('api_timer.js');
 
-let led = Cfg.get('pins.led');
 let unhexlify = ffi("char* unhexlify(char*)");
 
-GPIO.set_mode(led, GPIO.MODE_OUTPUT);
-Timer.set(1000 /* 1 sec */, Timer.REPEAT, function() {
-  let value = GPIO.toggle(led);
-  print(value ? 'Tick' : 'Tock', 'uptime:', Sys.uptime(), JSON.stringify({
+Timer.set(1000 * 10, Timer.REPEAT, function() {
+  print('PING! Uptime:', Sys.uptime(), JSON.stringify({
     total_ram: Sys.total_ram(),
     free_ram: Sys.free_ram()
   }));
