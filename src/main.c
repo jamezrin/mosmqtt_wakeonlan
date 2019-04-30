@@ -150,11 +150,6 @@ enum mgos_app_init_result mgos_app_init(void) {
   return MGOS_APP_INIT_SUCCESS;
 }
 
-void test_ping(char *string) {
-  options->ip = ipaddr_addr(string);
-  ping_start(options);
-}
-
 void find_device(char *target_hwaddr, device_callback cb, void *userdata) {
   (void) userdata;
 
