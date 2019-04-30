@@ -52,9 +52,11 @@ void recv_func(void *arg, void *pdata) {
     struct eth_addr *found_hwaddr = NULL;
     ip_addr_t *found_ipaddr = NULL;
 
+    struct netif sta_iface = netif_list[STATION_IF];
+
     // returns -1 if not in the arp table
     s8_t result = etharp_find_addr(
-      &netif_list[STATION_IF],
+      &sta_iface,
       &target_head->next_ipaddr,
       &found_hwaddr,
       &found_ipaddr
@@ -104,15 +106,11 @@ void recv_func(void *arg, void *pdata) {
     } else {
       LOG(LL_INFO, ("hwaddrs did not match"));
 
-      // todo: get directly from netif_list[STATION_IF]
-      struct ip_info info;
-      wifi_get_ip_info(STATION_IF, &info);
-
       ip_addr_t network_addr;
-      network_addr.addr = info.ip.addr & info.netmask.addr;
+      network_addr.addr = sta_iface.ip_addr.addr & sta_iface.netmask.addr;
 
       ip_addr_t broadcast_addr;
-      broadcast_addr.addr = network_addr.addr | ~info.netmask.addr;
+      broadcast_addr.addr = network_addr.addr | ~sta_iface.netmask.addr;
 
       ip_addr_t next_addr;
       next_addr.addr = ntohl(htonl(target_head->next_ipaddr.addr) + 1);
@@ -197,12 +195,10 @@ void clear_list(void) {
 }
 
 void find_device(struct eth_addr *target_hwaddr, device_callback cb, void *userdata) {
-  // todo: get directly from netif_list[STATION_IF]
-  struct ip_info info;
-  wifi_get_ip_info(STATION_IF, &info);
+  struct netif *sta_if = &netif_list[STATION_IF];
 
   ip_addr_t network_addr;
-  network_addr.addr = info.ip.addr & info.netmask.addr;
+  network_addr.addr = sta_if->ip_addr.addr & sta_if->netmask.addr;
 
   ip_addr_t first_addr;
   first_addr.addr = ntohl(htonl(network_addr.addr) + 1);
@@ -243,6 +239,7 @@ void find_device(struct eth_addr *target_hwaddr, device_callback cb, void *userd
   ));
 }
 
+// todo: ...
 void wake_device(struct eth_addr *target_hwaddr) {
   (void) target_hwaddr;
 }
@@ -277,6 +274,7 @@ struct eth_addr *a2hwaddr(char *str) {
 }
 
 // todo: ensure valid string
+// takes an ascii with chars representing the hex values
 void find_device_a(char *target_hwaddr, device_callback cb, void *userdata) {
   find_device(
     a2hwaddr(target_hwaddr), 
@@ -286,6 +284,7 @@ void find_device_a(char *target_hwaddr, device_callback cb, void *userdata) {
 }
 
 // todo: ensure valid string
+// takes an ascii with chars representing the hex values
 void wake_device_a(char *target_hwaddr) {
   wake_device(a2hwaddr(target_hwaddr));
 }
