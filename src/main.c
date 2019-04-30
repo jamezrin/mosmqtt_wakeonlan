@@ -64,22 +64,16 @@ void recv_func(void *arg, void *pdata) {
 
     if (result != -1) {
       LOG(LL_INFO, (
-        "comparing found hwaddr %02hx:%02hx:%02hx:%02hx:%02hx:%02hx (%d.%d.%d.%d)"
-        " with target %02hx:%02hx:%02hx:%02hx:%02hx:%02hx",
+        "comparing found hwaddr " MACSTR 
+        " (" IPSTR ") with target " MACSTR,
 
-        found_hwaddr->addr[0], found_hwaddr->addr[1],
-        found_hwaddr->addr[2], found_hwaddr->addr[3],
-        found_hwaddr->addr[4], found_hwaddr->addr[5],
-
+        MAC2STR(found_hwaddr->addr),
         IP2STR(&target_head->next_ipaddr),
-
-        target_head->target_hwaddr->addr[0], target_head->target_hwaddr->addr[1],
-        target_head->target_hwaddr->addr[2], target_head->target_hwaddr->addr[3],
-        target_head->target_hwaddr->addr[4], target_head->target_hwaddr->addr[5]
+        MAC2STR(target_head->target_hwaddr->addr)
       ));
     } else {
       LOG(LL_INFO, (
-        "could not find hwaddr of %d.%d.%d.%d", 
+        "could not find hwaddr of " IPSTR, 
         IP2STR(&target_head->next_ipaddr)
       ));
     }
@@ -231,12 +225,8 @@ void find_device(struct eth_addr *target_hwaddr, device_callback cb, void *userd
     ping_start(options);
   }
 
-  LOG(LL_INFO, ("added new target for %02hx:%02hx:%02hx:%02hx:%02hx:%02hx at position %u", 
-    target_head->target_hwaddr->addr[0], target_head->target_hwaddr->addr[1],
-    target_head->target_hwaddr->addr[2], target_head->target_hwaddr->addr[3],
-    target_head->target_hwaddr->addr[4], target_head->target_hwaddr->addr[5],
-    position
-  ));
+  LOG(LL_INFO, ("added new target for " MACSTR " at position %u",
+    MAC2STR(target_head->target_hwaddr->addr), position));
 }
 
 // todo: ...
