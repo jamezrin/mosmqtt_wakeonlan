@@ -181,6 +181,21 @@ enum mgos_app_init_result mgos_app_init(void) {
   return MGOS_APP_INIT_SUCCESS;
 }
 
+void clear_list(void) {
+  struct ping_target *current = target_head;
+
+  // promote next and free previous
+  while (current != NULL) {
+    struct ping_target *previous = current;
+    current = previous->next;
+    
+    free(previous->target_hwaddr);
+    free(previous);
+  }
+
+  target_head = NULL;
+}
+
 void find_device(struct eth_addr *target_hwaddr, device_callback cb, void *userdata) {
   // todo: get directly from netif_list[STATION_IF]
   struct ip_info info;
