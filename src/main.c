@@ -27,7 +27,7 @@
 typedef void(*device_callback)(char *ip_addr, void *userdata);
 
 struct ping_target {
-  uint32               remaining_recv;
+  u32_t                remaining_recv;
   struct eth_addr      *target_hwaddr;
   ip_addr_t            next_ipaddr;
   
@@ -41,7 +41,7 @@ static struct ping_option *options = NULL;
 static struct ping_target *target_head = NULL;
 
 void recv_func(void *arg, void *pdata) {
-  LOG(LL_INFO, ("recv_func"));
+  LOG(LL_DEBUG, ("recv_func"));
   (void) arg;
   (void) pdata;
 
@@ -62,8 +62,8 @@ void recv_func(void *arg, void *pdata) {
 
     if (result != -1) {
       LOG(LL_INFO, (
-        "comparing found hwaddr %02hx:%02hx:%02hx:%02hx:%02hx:%02hx"
-        "(%d.%d.%d.%d) with target %02hx:%02hx:%02hx:%02hx:%02hx:%02hx",
+        "comparing found hwaddr %02hx:%02hx:%02hx:%02hx:%02hx:%02hx (%d.%d.%d.%d)"
+        " with target %02hx:%02hx:%02hx:%02hx:%02hx:%02hx",
 
         found_hwaddr->addr[0], found_hwaddr->addr[1],
         found_hwaddr->addr[2], found_hwaddr->addr[3],
@@ -119,7 +119,7 @@ void recv_func(void *arg, void *pdata) {
 
       if (next_addr.addr == broadcast_addr.addr) {
         // end of this target, execute callback with null address
-        LOG(LL_INFO, ("end of target, calling callback"));
+        LOG(LL_INFO, ("end of target, executing callback"));
 
         struct ping_target *previous = target_head;
         previous->callback(NULL, previous->userdata);
@@ -137,7 +137,9 @@ void recv_func(void *arg, void *pdata) {
         free(previous);
       } else {
         // not what we wanted, but in range so next address
-        LOG(LL_INFO, ("in range, next address"));
+        LOG(LL_INFO, ("in range, next address (%u remaining)", 
+          htonl(broadcast_addr.addr) - htonl(next_addr.addr)
+        ));
 
         target_head->next_ipaddr = next_addr;
         target_head->remaining_recv = options->count; // reset recv for next addr
@@ -149,7 +151,7 @@ void recv_func(void *arg, void *pdata) {
 }
 
 void sent_func(void *arg, void *pdata) {
-  LOG(LL_INFO, ("sent_func"));
+  LOG(LL_DEBUG, ("sent_func"));
   (void) arg;
   (void) pdata;
 }
@@ -173,6 +175,8 @@ enum mgos_app_init_result mgos_app_init(void) {
   // possible cons:
   // - maybe it does not work
   // to try after first prototype is working
+
+  // todo: event handler if network changes, reset queue
   set_default_option(&options);
   return MGOS_APP_INIT_SUCCESS;
 }
@@ -198,13 +202,16 @@ void find_device(struct eth_addr *target_hwaddr, device_callback cb, void *userd
   next->callback = cb;
   next->next = NULL;
 
+  u32_t position = 0;
   if (target_head != NULL) {
     // something in queue already, add to the last element in queue
     // the next element will be started when the current one ends
     struct ping_target *current = target_head;
     while (current->next != NULL) {
+      position++;
       current = current->next;
     }
+    position++;
     current->next = next;
   } else {
     // first element in the queue, we must start immediately
@@ -213,19 +220,19 @@ void find_device(struct eth_addr *target_hwaddr, device_callback cb, void *userd
     ping_start(options);
   }
 
-  LOG(LL_INFO, ("added new target for %02hx:%02hx:%02hx:%02hx:%02hx:%02hx", 
+  LOG(LL_INFO, ("added new target for %02hx:%02hx:%02hx:%02hx:%02hx:%02hx at position %u", 
     target_head->target_hwaddr->addr[0], target_head->target_hwaddr->addr[1],
     target_head->target_hwaddr->addr[2], target_head->target_hwaddr->addr[3],
-    target_head->target_hwaddr->addr[4], target_head->target_hwaddr->addr[5]
+    target_head->target_hwaddr->addr[4], target_head->target_hwaddr->addr[5],
+    position
   ));
 }
 
 void wake_device(struct eth_addr *target_hwaddr) {
   (void) target_hwaddr;
-  
 }
 
-uint32 a2v(char c) {
+u32_t a2v(char c) {
   if (c >= 'A' && c <= 'F') {
     c += 32;
   }
@@ -254,6 +261,7 @@ struct eth_addr *a2hwaddr(char *str) {
   return addr;
 }
 
+// todo: ensure valid string
 void find_device_a(char *target_hwaddr, device_callback cb, void *userdata) {
   find_device(
     a2hwaddr(target_hwaddr), 
@@ -262,7 +270,7 @@ void find_device_a(char *target_hwaddr, device_callback cb, void *userdata) {
   );
 }
 
+// todo: ensure valid string
 void wake_device_a(char *target_hwaddr) {
   wake_device(a2hwaddr(target_hwaddr));
 }
-

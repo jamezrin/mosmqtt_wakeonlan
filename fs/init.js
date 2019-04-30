@@ -17,7 +17,8 @@ Timer.set(1000 * 10, Timer.REPEAT, function () {
   }));
   */
 
-  find_device("408d5cb21c65", function (ipaddr, userdata) {
-    print("found at: ", ipaddr, userdata);
-  }, null);
+  //find_device("408d5cb21c65", function (ipaddr, userdata) {
+  find_device("aabbccddeeff", function (ipaddr, userdata) {
+    print("Found address: ", ipaddr, userdata);
+  }, "some user data");
 }, null);
