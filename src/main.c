@@ -50,6 +50,7 @@ void recv_func(void *arg, void *pdata) {
   LOG(LL_INFO, ("recv_func"));
 
   if (target_head != NULL) {
+    // todo: require a minimum of packets received
 //    if (--target_head->remaining_recv > 0) 
 //      return;
 
@@ -65,8 +66,9 @@ void recv_func(void *arg, void *pdata) {
     );
 
     // todo: compare an eth_addr with the char* hwaddr
-    if (result != -1 && false /* todo: compare if macs are equal */) {
-      target_head->callback(ipaddr_ntoa(found_ipaddr), NULL);
+    // have to figure out converting
+    if (result != -1 && false /* todo: compare if MACs are equal */) {
+      target_head->callback(ipaddr_ntoa(found_ipaddr), NULL); // todo: pass mac in userdata
     
       // found the target, promote next target and start
       struct ping_target *previous = target_head;
@@ -98,7 +100,6 @@ void recv_func(void *arg, void *pdata) {
 	
 	//promote next target and start
         target_head = previous->next;
-
 	if (target_head != NULL) {
           options->ip = target_head->next_ipaddr.addr;
 	  ping_start(options);
