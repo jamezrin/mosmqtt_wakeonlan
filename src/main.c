@@ -64,7 +64,7 @@ void recv_func(void *arg, void *pdata) {
       &found_ipaddr
     );
 
-    // todo: mirar como se convierte una mac normal en un eth_addr
+    // todo: compare an eth_addr with the char* hwaddr
     if (result != -1 && false /* todo: compare if macs are equal */) {
       target_head->callback(ipaddr_ntoa(found_ipaddr), NULL);
     
@@ -78,6 +78,7 @@ void recv_func(void *arg, void *pdata) {
 
       free(previous);
     } else {
+      // todo: get directly from netif_list[STATION_IF]
       struct ip_info info;
       wifi_get_ip_info(STATION_IF, &info);
 
@@ -91,8 +92,11 @@ void recv_func(void *arg, void *pdata) {
       next_addr.addr = ntohl(htonl(target_head->next_ipaddr.addr) + 1);
 
       if (next_addr.addr == broadcast_addr.addr) {
-        // end of this target, promote next target and start
-        struct ping_target *previous = target_head;
+        // end of this target, execute callback with error
+	struct ping_target *previous = target_head;
+	previous->callback(NULL, NULL); // todo: pass mac in userdata
+	
+	//promote next target and start
         target_head = previous->next;
 
 	if (target_head != NULL) {
@@ -140,6 +144,7 @@ void test_ping(char *string) {
 void find_device(char *target_hwaddr, device_callback cb, void *userdata) {
   (void) userdata;
 
+  // todo: get directly from netif_list[STATION_IF]
   struct ip_info info;
   wifi_get_ip_info(STATION_IF, &info);
 
