@@ -31,6 +31,7 @@ struct ping_target {
   char                 *target_hwaddr;
   ip_addr_t            next_ipaddr;
   device_callback      callback;
+  void                 *userdata;
   struct ping_target   *next;
 } ping_target;
 
@@ -51,8 +52,8 @@ void recv_func(void *arg, void *pdata) {
 
   if (target_head != NULL) {
     // todo: require a minimum of packets received
-//    if (--target_head->remaining_recv > 0) 
-//      return;
+    //if (--target_head->remaining_recv > 0) 
+    //  return;
 
     struct eth_addr *found_hwaddr = NULL;
     ip_addr_t *found_ipaddr = NULL;
@@ -68,8 +69,11 @@ void recv_func(void *arg, void *pdata) {
     // todo: compare an eth_addr with the char* hwaddr
     // have to figure out converting
     if (result != -1 && false /* todo: compare if MACs are equal */) {
-      target_head->callback(ipaddr_ntoa(found_ipaddr), NULL); // todo: pass mac in userdata
-    
+      target_head->callback(
+        ipaddr_ntoa(found_ipaddr), 
+        target_head->userdata
+      );
+
       // found the target, promote next target and start
       struct ping_target *previous = target_head;
       if (previous->next != NULL) {
@@ -94,24 +98,24 @@ void recv_func(void *arg, void *pdata) {
       next_addr.addr = ntohl(htonl(target_head->next_ipaddr.addr) + 1);
 
       if (next_addr.addr == broadcast_addr.addr) {
-        // end of this target, execute callback with error
-	struct ping_target *previous = target_head;
-	previous->callback(NULL, NULL); // todo: pass mac in userdata
+        // end of this target, execute callback with null address
+        struct ping_target *previous = target_head;
+        previous->callback(NULL, previous->userdata);
 	
-	//promote next target and start
+        //promote next target and start
         target_head = previous->next;
-	if (target_head != NULL) {
+        if (target_head != NULL) {
           options->ip = target_head->next_ipaddr.addr;
-	  ping_start(options);
+          ping_start(options);
         }
-        
+
         free(previous);
       } else {
         // not what we wanted, but in range so next address
         target_head->next_ipaddr = next_addr;
-	target_head->remaining_recv = options->count; // reset recv for next addr
+        target_head->remaining_recv = options->count; // reset recv for next addr
         options->ip = next_addr.addr;
-	ping_start(options);
+        ping_start(options);
       }
     }
   }
@@ -133,6 +137,15 @@ void set_default_option(struct ping_option **opt_ret) {
 }
 
 enum mgos_app_init_result mgos_app_init(void) {
+  // todo: refractor (maybe instead of using ping we can use etharp_query)
+  // if successful, we can use etharp_find_addr to get and compare MACs
+  // possible pros: 
+  // - much faster lookup
+  // - simpler code structure
+  // - safer (devices must reply to ARP, unlike ICMP)
+  // possible cons:
+  // - maybe it does not work
+  // to try after first prototype is working
   set_default_option(&options);
   return MGOS_APP_INIT_SUCCESS;
 }
@@ -161,18 +174,20 @@ void find_device(char *target_hwaddr, device_callback cb, void *userdata) {
   next->next_ipaddr = first_addr;
   next->target_hwaddr = target_hwaddr;
   next->remaining_recv = options->count;
+  next->userdata = userdata;
   next->callback = cb;
   next->next = NULL;
 
   if (target_head != NULL) {
     // something in queue already, add to the last element in queue
+    // the next element will be started when the current one ends
     struct ping_target *current = target_head;
     while (current->next != NULL) {
       current = current->next;
     }
     current->next = next;
   } else {
-    // first element in the queue, must start manually
+    // first element in the queue, we must start immediately
     target_head = next;
     options->ip = target_head->next_ipaddr.addr;
     ping_start(options);
