@@ -28,32 +28,26 @@ typedef void(*device_callback)(char *ip_addr, void *userdata);
 
 struct ping_target {
   uint32               remaining_recv;
-  char                 *target_hwaddr;
+  struct eth_addr      *target_hwaddr;
   ip_addr_t            next_ipaddr;
+  
   device_callback      callback;
   void                 *userdata;
+
   struct ping_target   *next;
 } ping_target;
 
 static struct ping_option *options = NULL;
 static struct ping_target *target_head = NULL;
 
-// converts ascii string to eth_addr
-struct eth_addr* atoeth(char *str) {
-  (void) str;
-  return NULL;
-}
-
 void recv_func(void *arg, void *pdata) {
+  LOG(LL_INFO, ("recv_func"));
   (void) arg;
   (void) pdata;
 
-  LOG(LL_INFO, ("recv_func"));
-
   if (target_head != NULL) {
-    // todo: require a minimum of packets received
-    //if (--target_head->remaining_recv > 0) 
-    //  return;
+    if (--target_head->remaining_recv > 0) 
+      return;
 
     struct eth_addr *found_hwaddr = NULL;
     ip_addr_t *found_ipaddr = NULL;
@@ -66,24 +60,50 @@ void recv_func(void *arg, void *pdata) {
       &found_ipaddr
     );
 
-    // todo: compare an eth_addr with the char* hwaddr
-    // have to figure out converting
-    if (result != -1 && false /* todo: compare if MACs are equal */) {
-      target_head->callback(
+    if (result != -1) {
+      LOG(LL_INFO, (
+        "comparing found hwaddr %02hx:%02hx:%02hx:%02hx:%02hx:%02hx"
+        "(%d.%d.%d.%d) with target %02hx:%02hx:%02hx:%02hx:%02hx:%02hx",
+
+        found_hwaddr->addr[0], found_hwaddr->addr[1],
+        found_hwaddr->addr[2], found_hwaddr->addr[3],
+        found_hwaddr->addr[4], found_hwaddr->addr[5],
+
+        IP2STR(&target_head->next_ipaddr),
+
+        target_head->target_hwaddr->addr[0], target_head->target_hwaddr->addr[1],
+        target_head->target_hwaddr->addr[2], target_head->target_hwaddr->addr[3],
+        target_head->target_hwaddr->addr[4], target_head->target_hwaddr->addr[5]
+      ));
+    } else {
+      LOG(LL_INFO, (
+        "could not find hwaddr of %d.%d.%d.%d", 
+        IP2STR(&target_head->next_ipaddr)
+      ));
+    }
+
+    if (result != -1 && eth_addr_cmp(found_hwaddr, target_head->target_hwaddr)) {
+      LOG(LL_INFO, ("hwaddrs matched, executing callback"));
+
+      // found the target, execute callback and promote next
+      struct ping_target *previous = target_head;
+
+      previous->callback(
         ipaddr_ntoa(found_ipaddr), 
         target_head->userdata
       );
 
-      // found the target, promote next target and start
-      struct ping_target *previous = target_head;
-      if (previous->next != NULL) {
-        target_head = previous->next;
+      target_head = previous->next;
+      if (target_head != NULL) {
         options->ip = target_head->next_ipaddr.addr;
         ping_start(options);
       }
 
+      free(previous->target_hwaddr);
       free(previous);
     } else {
+      LOG(LL_INFO, ("hwaddrs did not match"));
+
       // todo: get directly from netif_list[STATION_IF]
       struct ip_info info;
       wifi_get_ip_info(STATION_IF, &info);
@@ -99,19 +119,26 @@ void recv_func(void *arg, void *pdata) {
 
       if (next_addr.addr == broadcast_addr.addr) {
         // end of this target, execute callback with null address
+        LOG(LL_INFO, ("end of target, calling callback"));
+
         struct ping_target *previous = target_head;
         previous->callback(NULL, previous->userdata);
 	
         //promote next target and start
         target_head = previous->next;
         if (target_head != NULL) {
+          LOG(LL_INFO, ("starting next target"));
+
           options->ip = target_head->next_ipaddr.addr;
           ping_start(options);
         }
 
+        free(previous->target_hwaddr);
         free(previous);
       } else {
         // not what we wanted, but in range so next address
+        LOG(LL_INFO, ("in range, next address"));
+
         target_head->next_ipaddr = next_addr;
         target_head->remaining_recv = options->count; // reset recv for next addr
         options->ip = next_addr.addr;
@@ -122,15 +149,15 @@ void recv_func(void *arg, void *pdata) {
 }
 
 void sent_func(void *arg, void *pdata) {
+  LOG(LL_INFO, ("sent_func"));
   (void) arg;
   (void) pdata;
-  LOG(LL_INFO, ("sent_func"));
 }
 
 void set_default_option(struct ping_option **opt_ret) {
   struct ping_option *options = NULL;
   options = (struct ping_option *) os_zalloc(sizeof(struct ping_option));
-  options->sent_function = sent_func;
+  //options->sent_function = sent_func;
   options->recv_function = recv_func;
   options->count = PING_COUNT;
   *opt_ret = options;
@@ -150,9 +177,7 @@ enum mgos_app_init_result mgos_app_init(void) {
   return MGOS_APP_INIT_SUCCESS;
 }
 
-void find_device(char *target_hwaddr, device_callback cb, void *userdata) {
-  (void) userdata;
-
+void find_device(struct eth_addr *target_hwaddr, device_callback cb, void *userdata) {
   // todo: get directly from netif_list[STATION_IF]
   struct ip_info info;
   wifi_get_ip_info(STATION_IF, &info);
@@ -187,9 +212,57 @@ void find_device(char *target_hwaddr, device_callback cb, void *userdata) {
     options->ip = target_head->next_ipaddr.addr;
     ping_start(options);
   }
+
+  LOG(LL_INFO, ("added new target for %02hx:%02hx:%02hx:%02hx:%02hx:%02hx", 
+    target_head->target_hwaddr->addr[0], target_head->target_hwaddr->addr[1],
+    target_head->target_hwaddr->addr[2], target_head->target_hwaddr->addr[3],
+    target_head->target_hwaddr->addr[4], target_head->target_hwaddr->addr[5]
+  ));
 }
 
-void wake_device(char *target_hwaddr) {
+void wake_device(struct eth_addr *target_hwaddr) {
   (void) target_hwaddr;
+  
+}
+
+uint32 a2v(char c) {
+  if (c >= 'A' && c <= 'F') {
+    c += 32;
+  }
+
+  if (c >= '0' && c <= '9') {
+    return c - '0';
+  }
+
+  if (c >= 'a' && c <= 'f') {
+    return c - 'a' + 10;
+  }
+
+  return 0;
+}
+
+// converts ascii string to eth_addr
+// returned pointer must be freed manually
+struct eth_addr *a2hwaddr(char *str) {
+  struct eth_addr *addr = os_zalloc(sizeof(struct eth_addr));
+  addr->addr[0] = (a2v(str[0]) << 4) + a2v(str[1]);
+  addr->addr[1] = (a2v(str[2]) << 4) + a2v(str[3]);
+  addr->addr[2] = (a2v(str[4]) << 4) + a2v(str[5]);
+  addr->addr[3] = (a2v(str[6]) << 4) + a2v(str[7]);
+  addr->addr[4] = (a2v(str[8]) << 4) + a2v(str[9]);
+  addr->addr[5] = (a2v(str[10]) << 4) + a2v(str[11]);
+  return addr;
+}
+
+void find_device_a(char *target_hwaddr, device_callback cb, void *userdata) {
+  find_device(
+    a2hwaddr(target_hwaddr), 
+    cb, 
+    userdata
+  );
+}
+
+void wake_device_a(char *target_hwaddr) {
+  wake_device(a2hwaddr(target_hwaddr));
 }
 

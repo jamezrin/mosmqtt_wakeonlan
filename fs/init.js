@@ -6,12 +6,18 @@ load('api_sys.js');
 load('api_timer.js');
 load('api_wifi.js');
 
-let find_device = ffi('void find_device(char*, void (*)(char*, userdata), userdata)');
-let wake_device = ffi('void wake_device(char*)');
+let find_device = ffi('void find_device_a(char*, void (*)(char*, userdata), userdata)');
+let wake_device = ffi('void wake_device_a(char*)');
 
-Timer.set(1000 * 1, Timer.REPEAT, function () {
+Timer.set(1000 * 10, Timer.REPEAT, function () {
+  /*
   print('PING! Uptime:', Sys.uptime(), JSON.stringify({
     total_ram: Sys.total_ram(),
     free_ram: Sys.free_ram()
   }));
+  */
+
+  find_device("408d5cb21c65", function (ipaddr, userdata) {
+    print("found at: ", ipaddr, userdata);
+  }, null);
 }, null);
