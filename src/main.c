@@ -25,11 +25,12 @@
 #include <ipv4/lwip/ip.h>
 #include <ipv4/lwip/icmp.h>
 
+// todo: include some error parameter to know the result
 typedef void(*device_callback)(char *ip_addr, void *userdata);
 
 struct ping_target {
   u32_t                remaining_recv;
-  struct eth_addr      *target_hwaddr;
+  struct eth_addr      target_hwaddr;
   ip_addr_t            current_ipaddr;
 
   device_callback      callback;
@@ -53,7 +54,7 @@ void recv_func(void *arg, void *pdata) {
     ip_addr_t *found_ipaddr = NULL;
 
     struct netif sta_iface = netif_list[STATION_IF];
-    
+
     // returns -1 if not in the arp table
     s8_t result = etharp_find_addr(
       &sta_iface,
@@ -69,7 +70,7 @@ void recv_func(void *arg, void *pdata) {
 
         MAC2STR(found_hwaddr->addr),
         IP2STR(&target_head->current_ipaddr),
-        MAC2STR(target_head->target_hwaddr->addr)
+        MAC2STR(target_head->target_hwaddr.addr)
       ));
     } else {
       LOG(LL_INFO, (
@@ -78,7 +79,7 @@ void recv_func(void *arg, void *pdata) {
       ));
     }
 
-    if (result != -1 && eth_addr_cmp(found_hwaddr, target_head->target_hwaddr)) {
+    if (result != -1 && eth_addr_cmp(found_hwaddr, &target_head->target_hwaddr)) {
       LOG(LL_INFO, ("hwaddrs matched, executing callback"));
 
       // found the target, execute callback and promote next
@@ -95,7 +96,6 @@ void recv_func(void *arg, void *pdata) {
         ping_start(options);
       }
 
-      free(previous->target_hwaddr);
       free(previous);
     } else {
       LOG(LL_INFO, ("hwaddrs did not match"));
@@ -125,7 +125,6 @@ void recv_func(void *arg, void *pdata) {
           ping_start(options);
         }
 
-        free(previous->target_hwaddr);
         free(previous);
       } else {
         // not what we wanted, but in range so next address
@@ -182,14 +181,13 @@ void clear_list(void) {
     struct ping_target *previous = current;
     current = previous->next;
     
-    free(previous->target_hwaddr);
     free(previous);
   }
 
   target_head = NULL;
 }
 
-void find_device(struct eth_addr *target_hwaddr, device_callback cb, void *userdata) {
+void find_device(struct eth_addr target_hwaddr, device_callback cb, void *userdata) {
   struct netif *sta_if = &netif_list[STATION_IF];
 
   ip_addr_t network_ipaddr;
@@ -227,12 +225,12 @@ void find_device(struct eth_addr *target_hwaddr, device_callback cb, void *userd
   }
 
   LOG(LL_INFO, ("added new target for " MACSTR " at position %u",
-    MAC2STR(target_head->target_hwaddr->addr), position));
+    MAC2STR(target_head->target_hwaddr.addr), position));
 }
 
 // todo: ...
 // use mg_connect and mg_send
-void wake_device(struct eth_addr *target_hwaddr) {
+void wake_device(struct eth_addr target_hwaddr) {
   //mg_connect()
   //mg_send()
   (void) target_hwaddr;
@@ -255,16 +253,16 @@ u32_t a2v(char c) {
 }
 
 // converts ascii string to eth_addr
-// returned pointer must be freed manually
-struct eth_addr *a2hwaddr(char *str) {
-  struct eth_addr *addr = os_zalloc(sizeof(struct eth_addr));
-  addr->addr[0] = (a2v(str[0]) << 4) + a2v(str[1]);
-  addr->addr[1] = (a2v(str[2]) << 4) + a2v(str[3]);
-  addr->addr[2] = (a2v(str[4]) << 4) + a2v(str[5]);
-  addr->addr[3] = (a2v(str[6]) << 4) + a2v(str[7]);
-  addr->addr[4] = (a2v(str[8]) << 4) + a2v(str[9]);
-  addr->addr[5] = (a2v(str[10]) << 4) + a2v(str[11]);
-  return addr;
+struct eth_addr a2hwaddr(char *str) {
+  struct eth_addr hwaddr = {{
+    (a2v(str[0]) << 4) + a2v(str[1]),
+    (a2v(str[2]) << 4) + a2v(str[3]),
+    (a2v(str[4]) << 4) + a2v(str[5]),
+    (a2v(str[6]) << 4) + a2v(str[7]),
+    (a2v(str[8]) << 4) + a2v(str[9]),
+    (a2v(str[10]) << 4) + a2v(str[11])
+  }};
+  return hwaddr;
 }
 
 // todo: ensure valid string
