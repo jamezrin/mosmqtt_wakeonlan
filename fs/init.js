@@ -21,4 +21,6 @@ Timer.set(1000 * 10, Timer.REPEAT, function () {
     //find_device("aabbccddeeff", function (ipaddr, userdata) {
     print("Found address: ", ipaddr, userdata);
   }, "some user data");
+
+  wake_device("408d5cb21c65");
 }, null);

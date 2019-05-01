@@ -17,4 +17,7 @@
 // ping delay - in milliseconds
 #define PING_COARSE 100
 
+// add empty sent function to ping
+#define EMPTY_SENT_FUNC 1
+
 #endif
