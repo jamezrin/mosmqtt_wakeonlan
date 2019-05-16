@@ -1,6 +1,6 @@
-author: mosmqtt-wakeonlan
+author: Jaime Martínez jaime@jamezrin.name
 description: An app to help you wake your PCs remotely and securely
-# arch: PLATFORM
+arch: esp8266
 version: 1.0
 manifest_version: 2017-05-18
 libs_version: ${mos.version}
@@ -8,11 +8,12 @@ modules_version: ${mos.version}
 mongoose_os_version: ${mos.version}
 
 config_schema:
-  - ["i2c.enable", true]
-  - ["mqtt.enable", true]
-  - ["http.enable", false]
-  - ["mqtt.server", "broker.losant.com:8883"]
-  - ["mqtt.ssl_ca_cert", "ca.pem"]
+  - ['i2c.enable', true]
+  - ['http.enable', false]
+  - ['mqtt.enable', true]
+  - ['mqtt.server', 'broker.losant.com:8883']
+  - ['mqtt.ssl_ca_cert', 'losant-ca.pem']
+  - ['provision.stable_state', 2]
 
 tags:
   - js
@@ -27,4 +28,5 @@ filesystem:
   - fs
 
 libs:
-  - origin: https://github.com/mongoose-os-libs/js-demo-bundle
+  - origin: https://github.com/mongoose-os-libs/demo-bundle
+  - origin: https://github.com/mongoose-os-libs/mjs
