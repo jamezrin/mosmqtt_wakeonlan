@@ -8,9 +8,11 @@ modules_version: ${mos.version}
 mongoose_os_version: ${mos.version}
 
 config_schema:
-  - ['i2c.enable', false]
-  - ['mqtt.enable', false]
+  - ['i2c.enable', true]
   - ['http.enable', false]
+  - ['mqtt.enable', true]
+  - ['mqtt.server', 'broker.losant.com:8883']
+  - ['mqtt.ssl_ca_cert', 'losant-ca.pem']
   - ['provision.stable_state', 2]
 
 tags:
