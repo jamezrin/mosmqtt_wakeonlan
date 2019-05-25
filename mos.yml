@@ -27,6 +27,11 @@ sources:
 filesystem:
   - fs
 
+build_vars:
+  PING_RCV_TIME0: 200
+  PING_TIMEOUT_MSG: 200
+  PING_COARSE: 200
+
 libs:
   - origin: https://github.com/mongoose-os-libs/demo-bundle
   - origin: https://github.com/mongoose-os-libs/mjs
