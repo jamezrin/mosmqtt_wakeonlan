@@ -25,6 +25,9 @@
 #include <ipv4/lwip/ip.h>
 #include <ipv4/lwip/icmp.h>
 
+void recv_func(void *arg, void *pdata);
+void sent_func(void *arg, void *pdata);
+
 // todo: include some error parameter to know the result
 typedef void(*device_callback)(char *ip_addr, void *userdata);
 
@@ -41,11 +44,9 @@ struct ping_target {
 
 static struct ping_option *options = NULL;
 static struct ping_target *target_head = NULL;
+static u32_t target_list_size = 0;
 
-void recv_func(void *arg, void *pdata) {
-  LOG(LL_DEBUG, ("recv_func"));
-  (void) arg; (void) pdata;
-
+void process_recv(void) {
   if (target_head != NULL) {
     if (--target_head->remaining_recv > 0) 
       return;
@@ -90,13 +91,15 @@ void recv_func(void *arg, void *pdata) {
         target_head->userdata
       );
 
+      // promote next target and free previous
       target_head = previous->next;
+      target_list_size--;
+      free(previous);
+
       if (target_head != NULL) {
         options->ip = target_head->current_ipaddr.addr;
         ping_start(options);
       }
-
-      free(previous);
     } else {
       LOG(LL_INFO, ("hwaddrs did not match"));
 
@@ -116,16 +119,17 @@ void recv_func(void *arg, void *pdata) {
         struct ping_target *previous = target_head;
         previous->callback(NULL, previous->userdata);
 	
-        //promote next target and start
+        // promote next target and free previous
         target_head = previous->next;
+        target_list_size--;
+        free(previous);
+        
         if (target_head != NULL) {
           LOG(LL_INFO, ("starting next target"));
 
           options->ip = target_head->current_ipaddr.addr;
           ping_start(options);
         }
-
-        free(previous);
       } else {
         // not what we wanted, but in range so next address
         LOG(LL_INFO, ("in range, next address (%u remaining)", 
@@ -141,10 +145,6 @@ void recv_func(void *arg, void *pdata) {
   }
 }
 
-void sent_func(void *arg, void *pdata) {
-  LOG(LL_DEBUG, ("sent_func"));
-  (void) arg; (void) pdata;
-}
 
 void set_default_option(struct ping_option **opt_ret) {
   struct ping_option *options = NULL;
@@ -169,6 +169,8 @@ enum mgos_app_init_result mgos_app_init(void) {
   // to try after first prototype is working
 
   // todo: event handler if network changes, reset queue
+  // todo: add protection for overflow when getting requests
+  
   set_default_option(&options);
   return MGOS_APP_INIT_SUCCESS;
 }
@@ -185,9 +187,45 @@ void clear_list(void) {
   }
 
   target_head = NULL;
+  target_list_size = 0;
+}
+
+u32_t a2v(char c) {
+  if (c >= 'A' && c <= 'F') {
+    c += 32;
+  }
+
+  if (c >= '0' && c <= '9') {
+    return c - '0';
+  }
+
+  if (c >= 'a' && c <= 'f') {
+    return c - 'a' + 10;
+  }
+
+  return 0;
+}
+
+// converts ascii string to eth_addr
+struct eth_addr a2hw(char *str) {
+  struct eth_addr hwaddr = {{
+    (a2v(str[0]) << 4) + a2v(str[1]),
+    (a2v(str[2]) << 4) + a2v(str[3]),
+    (a2v(str[4]) << 4) + a2v(str[5]),
+    (a2v(str[6]) << 4) + a2v(str[7]),
+    (a2v(str[8]) << 4) + a2v(str[9]),
+    (a2v(str[10]) << 4) + a2v(str[11])
+  }};
+  return hwaddr;
 }
 
 void find_device(struct eth_addr target_hwaddr, device_callback cb, void *userdata) {
+  // prevent buffer overflow
+  if (target_list_size == MAX_LIST_SIZE) {
+    LOG(LL_WARN, ("tried to exceed max target list size"));
+    return;
+  }
+
   struct netif *sta_if = &netif_list[STATION_IF];
 
   ip_addr_t network_ipaddr;
@@ -224,8 +262,21 @@ void find_device(struct eth_addr target_hwaddr, device_callback cb, void *userda
     ping_start(options);
   }
 
+  target_list_size++;
+
   LOG(LL_INFO, ("added new target for " MACSTR " at position %u",
     MAC2STR(target_head->target_hwaddr.addr), position));
+}
+
+// todo: ensure valid string
+// takes an ascii with chars representing the hex values
+void find_device_a(char *target_hwaddr, device_callback cb, void *userdata) {
+  struct eth_addr hwaddr = a2hw(target_hwaddr);
+  find_device(
+    hwaddr, 
+    cb,
+    userdata
+  );
 }
 
 // todo: ...
@@ -236,47 +287,21 @@ void wake_device(struct eth_addr target_hwaddr) {
   (void) target_hwaddr;
 }
 
-u32_t a2v(char c) {
-  if (c >= 'A' && c <= 'F') {
-    c += 32;
-  }
-
-  if (c >= '0' && c <= '9') {
-    return c - '0';
-  }
-
-  if (c >= 'a' && c <= 'f') {
-    return c - 'a' + 10;
-  }
-
-  return 0;
-}
-
-// converts ascii string to eth_addr
-struct eth_addr a2hwaddr(char *str) {
-  struct eth_addr hwaddr = {{
-    (a2v(str[0]) << 4) + a2v(str[1]),
-    (a2v(str[2]) << 4) + a2v(str[3]),
-    (a2v(str[4]) << 4) + a2v(str[5]),
-    (a2v(str[6]) << 4) + a2v(str[7]),
-    (a2v(str[8]) << 4) + a2v(str[9]),
-    (a2v(str[10]) << 4) + a2v(str[11])
-  }};
-  return hwaddr;
-}
-
-// todo: ensure valid string
-// takes an ascii with chars representing the hex values
-void find_device_a(char *target_hwaddr, device_callback cb, void *userdata) {
-  find_device(
-    a2hwaddr(target_hwaddr), 
-    cb,
-    userdata
-  );
-}
-
 // todo: ensure valid string
 // takes an ascii with chars representing the hex values
 void wake_device_a(char *target_hwaddr) {
-  wake_device(a2hwaddr(target_hwaddr));
+  struct eth_addr hwaddr = a2hw(target_hwaddr);
+  wake_device(hwaddr);
+}
+
+void recv_func(void *arg, void *pdata) {
+  LOG(LL_DEBUG, ("recv_func"));
+  (void) arg; (void) pdata;
+
+  process_recv();
+}
+
+void sent_func(void *arg, void *pdata) {
+  LOG(LL_DEBUG, ("sent_func"));
+  (void) arg; (void) pdata;
 }

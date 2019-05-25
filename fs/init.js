@@ -16,6 +16,7 @@ Timer.set(1000 * 10, Timer.REPEAT, function () {
     free_ram: Sys.free_ram()
   }));
   */
+
   for (let i = 0; i < 15; i++) {
     find_device("408d5cb21c65", function (ipaddr, userdata) {
       //find_device("aabbccddeeff", function (ipaddr, userdata) {

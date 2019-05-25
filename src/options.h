@@ -20,4 +20,6 @@
 // add empty sent function to ping
 #define EMPTY_SENT_FUNC 1
 
+#define MAX_LIST_SIZE 10
+
 #endif
