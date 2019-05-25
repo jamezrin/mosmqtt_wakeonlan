@@ -14,11 +14,9 @@
 
 // lwip stack
 #include <lwip/opt.h>
-#include <lwip/raw.h>
 #include <lwip/netif.h>
 #include <lwip/sys.h>
 #include <lwip/timers.h>
-#include <lwip/dhcp.h>
 #include <lwip/app/ping.h>
 #include <netif/etharp.h>
 #include <ipv4/lwip/ip_addr.h>
@@ -145,7 +143,6 @@ void process_recv(void) {
   }
 }
 
-
 void set_default_option(struct ping_option **opt_ret) {
   struct ping_option *options = NULL;
   options = (struct ping_option *) os_zalloc(sizeof(struct ping_option));
@@ -169,7 +166,6 @@ enum mgos_app_init_result mgos_app_init(void) {
   // to try after first prototype is working
 
   // todo: event handler if network changes, reset queue
-  // todo: add protection for overflow when getting requests
   
   set_default_option(&options);
   return MGOS_APP_INIT_SUCCESS;
@@ -220,7 +216,7 @@ struct eth_addr a2hw(char *str) {
 }
 
 void find_device(struct eth_addr target_hwaddr, device_callback cb, void *userdata) {
-  // prevent buffer overflow
+  // prevent buffer overrun
   if (target_list_size == MAX_LIST_SIZE) {
     LOG(LL_WARN, ("tried to exceed max target list size"));
     return;
@@ -268,9 +264,14 @@ void find_device(struct eth_addr target_hwaddr, device_callback cb, void *userda
     MAC2STR(target_head->target_hwaddr.addr), position));
 }
 
-// todo: ensure valid string
 // takes an ascii with chars representing the hex values
 void find_device_a(char *target_hwaddr, device_callback cb, void *userdata) {
+  // prevent buffer overrun
+  if (target_list_size == MAX_LIST_SIZE) {
+    LOG(LL_WARN, ("tried to exceed max target list size"));
+    return;
+  }
+
   struct eth_addr hwaddr = a2hw(target_hwaddr);
   find_device(
     hwaddr, 
@@ -279,15 +280,52 @@ void find_device_a(char *target_hwaddr, device_callback cb, void *userdata) {
   );
 }
 
-// todo: ...
-// use mg_connect and mg_send
-void wake_device(struct eth_addr target_hwaddr) {
-  //mg_connect()
-  //mg_send()
-  (void) target_hwaddr;
+static void ev_handler(struct mg_connection *nc, int ev, void *ev_data MG_UD_ARG(void *user_data)) {
+  switch (ev) {
+    case MG_EV_RECV:
+      fprintf(stderr, "%.*s", (int) nc->recv_mbuf.len, nc->recv_mbuf.buf);
+      nc->recv_mbuf.len = 0;
+      break;
+    default:
+      break;
+  }
+
+  (void) ev_data;
+  (void) user_data;
 }
 
-// todo: ensure valid string
+void craft_packet(struct eth_addr target_hwaddr, char* payload_out) {
+  for (u8_t i = 0; i < 6; i++) {
+    payload_out[i] = 0xFF;
+  }
+
+  for (u8_t i = 0; i < 16; i++) {
+    u8_t repetition_pos = i * 6;
+    for (u8_t j = 0; j < 6; j++) {
+      // offset from frame +
+      // position of the first value of this repetition +
+      // position of the current value to set
+      payload_out[6 + repetition_pos + j] = target_hwaddr.addr[j];
+    }
+  }
+}
+
+void wake_device(struct eth_addr target_hwaddr) {
+  char payload[102];
+  craft_packet(target_hwaddr, payload);
+  struct mg_mgr *mgr = mgos_get_mgr();
+  
+  struct mg_connection *conn = mg_connect(
+    mgr, 
+    "udp://255.255.255.255:9", 
+    ev_handler
+    MG_UD_ARG(NULL)
+  );
+
+  conn->flags |= MG_F_SEND_AND_CLOSE;
+  mg_send(conn, payload, strlen(payload));
+}
+
 // takes an ascii with chars representing the hex values
 void wake_device_a(char *target_hwaddr) {
   struct eth_addr hwaddr = a2hw(target_hwaddr);

@@ -4,7 +4,7 @@ set -e
 source .env
 
 # builds the firmware
-mos build
+mos build --local
 
 # flashes the firmware
 mos flash
@@ -21,6 +21,6 @@ mos config-set \
 mos wifi ${WIFI_SSID} "${WIFI_PSK}"
 
 # starts up the console
-mos console
+mos console | tee /tmp/console.log | grep -av 'hl{'
 
 exit 0
