@@ -57,3 +57,10 @@ MQTT.sub('FindDevice', function (conn, topic, msg) {
     }));
   }, null);
 });
+
+
+let clear_list = ffi('void clear_list()');
+
+Event.on(Event.CLOUD_DISCONNECTED, function () {
+  clear_list();
+}, null);

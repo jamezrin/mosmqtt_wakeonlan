@@ -165,8 +165,6 @@ enum mgos_app_init_result mgos_app_init(void) {
   // - maybe it does not work
   // to try after first prototype is working
 
-  // todo: event handler if network changes, reset queue
-  
   set_default_option(&options);
   return MGOS_APP_INIT_SUCCESS;
 }
@@ -215,7 +213,7 @@ struct eth_addr a2hw(char *str) {
   return hwaddr;
 }
 
-bool check_target_list_size() {
+bool check_target_list_size(void) {
   if (target_list_size >= MAX_LIST_SIZE) {
     LOG(LL_WARN, ("tried to exceed max target list size"));
     return false;
