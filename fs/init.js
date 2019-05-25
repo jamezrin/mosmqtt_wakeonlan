@@ -49,13 +49,13 @@ MQTT.sub('FindDevice', function (conn, topic, msg) {
   }), 1);
 
   find_device(data.mac, function (ipaddr, userdata) {
-    print("Discovered device:", data.mac, "with ip", ipaddr);
+    print("Discovered device", userdata.mac, "with ip", ipaddr);
     MQTT.pub('FoundDevice', JSON.stringify({
-      id: data.id,
-      mac: data.mac,
+      id: userdata.id,
+      mac: userdata.mac,
       ip: ipaddr
     }));
-  }, null);
+  }, data);
 });
 
 let clear_list = ffi('void clear_list()');
