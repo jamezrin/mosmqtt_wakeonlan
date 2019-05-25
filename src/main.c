@@ -186,7 +186,7 @@ void clear_list(void) {
   target_list_size = 0;
 }
 
-u32_t a2v(char c) {
+s16_t a2v(char c) {
   if (c >= 'A' && c <= 'F') {
     c += 32;
   }
@@ -199,7 +199,7 @@ u32_t a2v(char c) {
     return c - 'a' + 10;
   }
 
-  return 0;
+  return -1;
 }
 
 // converts ascii string to eth_addr
@@ -215,69 +215,85 @@ struct eth_addr a2hw(char *str) {
   return hwaddr;
 }
 
-void find_device(struct eth_addr target_hwaddr, device_callback cb, void *userdata) {
-  // prevent buffer overrun
-  if (target_list_size == MAX_LIST_SIZE) {
+bool check_target_list_size() {
+  if (target_list_size >= MAX_LIST_SIZE) {
     LOG(LL_WARN, ("tried to exceed max target list size"));
-    return;
+    return false;
+  }
+  return true;
+}
+
+bool check_hwaddr_syntax(char *hwaddr) {
+  if (strlen(hwaddr) != 12) {
+    LOG(LL_WARN, ("received invalid hwaddr (size): %s", hwaddr));
+    return false;
   }
 
-  struct netif *sta_if = &netif_list[STATION_IF];
-
-  ip_addr_t network_ipaddr;
-  network_ipaddr.addr = sta_if->ip_addr.addr & sta_if->netmask.addr;
-
-  ip_addr_t first_addr;
-  first_addr.addr = ntohl(htonl(network_ipaddr.addr) + 1);
-
-  struct ping_target *next = NULL;
-  next = (struct ping_target *) os_zalloc(sizeof(struct ping_target));
-
-  next->current_ipaddr = first_addr;
-  next->target_hwaddr = target_hwaddr;
-  next->remaining_recv = options->count;
-  next->userdata = userdata;
-  next->callback = cb;
-  next->next = NULL;
-
-  u32_t position = 0;
-  if (target_head != NULL) {
-    // something in queue already, add to the last element in queue
-    // the next element will be started when the current one ends
-    struct ping_target *current = target_head;
-    while (current->next != NULL) {
-      position++;
-      current = current->next;
+  for (u8_t i = 0; i < 12; i++) {
+    if (a2v(hwaddr[i]) == -1) {
+      LOG(LL_WARN, ("received invalid hwaddr (syntax): %s", hwaddr));
+      return false;
     }
-    position++;
-    current->next = next;
-  } else {
-    // first element in the queue, we must start immediately
-    target_head = next;
-    options->ip = target_head->current_ipaddr.addr;
-    ping_start(options);
   }
 
-  target_list_size++;
+  return true;
+}
 
-  LOG(LL_INFO, ("added new target for " MACSTR " at position %u",
-    MAC2STR(target_head->target_hwaddr.addr), position));
+void find_device(struct eth_addr target_hwaddr, device_callback cb, void *userdata) {
+  if (check_target_list_size()) {
+    struct netif *sta_if = &netif_list[STATION_IF];
+
+    ip_addr_t network_ipaddr;
+    network_ipaddr.addr = sta_if->ip_addr.addr & sta_if->netmask.addr;
+
+    ip_addr_t first_addr;
+    first_addr.addr = ntohl(htonl(network_ipaddr.addr) + 1);
+
+    struct ping_target *next = NULL;
+    next = (struct ping_target *) os_zalloc(sizeof(struct ping_target));
+
+    next->current_ipaddr = first_addr;
+    next->target_hwaddr = target_hwaddr;
+    next->remaining_recv = options->count;
+    next->userdata = userdata;
+    next->callback = cb;
+    next->next = NULL;
+
+    u32_t position = 0;
+    if (target_head != NULL) {
+      // something in queue already, add to the last element in queue
+      // the next element will be started when the current one ends
+      struct ping_target *current = target_head;
+      while (current->next != NULL) {
+        position++;
+        current = current->next;
+      }
+      position++;
+      current->next = next;
+    } else {
+      // first element in the queue, we must start immediately
+      target_head = next;
+      options->ip = target_head->current_ipaddr.addr;
+      ping_start(options);
+    }
+
+    target_list_size++;
+
+    LOG(LL_INFO, ("added new target for " MACSTR " at position %u",
+      MAC2STR(target_head->target_hwaddr.addr), position));
+  }
 }
 
 // takes an ascii with chars representing the hex values
 void find_device_a(char *target_hwaddr, device_callback cb, void *userdata) {
-  // prevent buffer overrun
-  if (target_list_size == MAX_LIST_SIZE) {
-    LOG(LL_WARN, ("tried to exceed max target list size"));
-    return;
+  if (check_target_list_size() && check_hwaddr_syntax(target_hwaddr)) {
+    struct eth_addr hwaddr = a2hw(target_hwaddr);
+    find_device(
+      hwaddr, 
+      cb,
+      userdata
+    );
   }
-
-  struct eth_addr hwaddr = a2hw(target_hwaddr);
-  find_device(
-    hwaddr, 
-    cb,
-    userdata
-  );
 }
 
 static void ev_handler(struct mg_connection *nc, int ev, void *ev_data MG_UD_ARG(void *user_data)) {
@@ -328,8 +344,10 @@ void wake_device(struct eth_addr target_hwaddr) {
 
 // takes an ascii with chars representing the hex values
 void wake_device_a(char *target_hwaddr) {
-  struct eth_addr hwaddr = a2hw(target_hwaddr);
-  wake_device(hwaddr);
+  if (check_hwaddr_syntax(target_hwaddr)) {
+    struct eth_addr hwaddr = a2hw(target_hwaddr);
+    wake_device(hwaddr);
+  }
 }
 
 void recv_func(void *arg, void *pdata) {
