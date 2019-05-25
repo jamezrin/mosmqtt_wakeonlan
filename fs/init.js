@@ -58,9 +58,24 @@ MQTT.sub('FindDevice', function (conn, topic, msg) {
   }, null);
 });
 
-
 let clear_list = ffi('void clear_list()');
 
-Event.on(Event.CLOUD_DISCONNECTED, function () {
-  clear_list();
+Event.addGroupHandler(Net.EVENT_GRP, function (ev, evdata, arg) {
+  let evs = '???';
+  if (ev === Net.STATUS_DISCONNECTED) {
+    evs = 'DISCONNECTED';
+  } else if (ev === Net.STATUS_CONNECTING) {
+    evs = 'CONNECTING';
+  } else if (ev === Net.STATUS_CONNECTED) {
+    evs = 'CONNECTED';
+  } else if (ev === Net.STATUS_GOT_IP) {
+    evs = 'GOT_IP';
+  }
+
+  if (ev === Net.STATUS_DISCONNECTED ||
+    ev === Net.STATUS_CONNECTING) {
+    clear_list();
+  }
+
+  print('Network event:', ev, evs);
 }, null);
