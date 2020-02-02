@@ -1,13 +1,13 @@
 # mosmqtt_wakeonlan
 
-An app for your esp8266 to wake your computer remotely and cheap
-
-This app is meant to be flashed to an esp8266, it will probably work on other devices
-but that hasn't been tested.
+This app for esp8266 sends wake on lan packets remotely, through MQTT.
+The esp8266 is an IoT device that's both reliable and inexpensive.
+It might work on other devices that share the SDK, but that has
+not been yet tested.
 
 You can find an esp8266 for around 4\$ in AliExpress or a bit more in Amazon.
 
-## Building and Flashing
+## Requirements
 
 To flash this app you'll need:
 
@@ -18,8 +18,43 @@ To flash this app you'll need:
 - [Losant Account](https://losant.com) You can use other brokers but Losant works great
 - Docker if you want to build locally, otherwise remove `--local` from `reflash.sh`
 
-If you want to modify code, specially C code install VS Code and [this extension](https://marketplace.visualstudio.com/items?itemName=alxandr.mongoose-deps-gen).
+## Building and Flashing
 
-You might also want to try installing the [official extension](https://marketplace.visualstudio.com/items?itemName=mongoose-os.mongoose-os-ide) but I preferred to work without it.
+1. Clone this repo
+
+   ```bash
+   git clone --recursive https://github.com/jamezrin/mosmqtt_wakeonlan
+   ```
+
+2. Run the flash script. If everything is fine, your device should be detected automatically and you should end up with a flashed device.
+
+   ```bash
+   ./reflash.sh
+   ```
+
+## Development
+
+If you plan to make changes, you will probably want IntelliSense, for that install the [official extension](https://marketplace.visualstudio.com/items?itemName=mongoose-os.mongoose-os-ide) from Cesanta.
+
+It is also recommended running at least one time the flash script, or at least, `mos build --local`.
+
+Make sure your C/C++ properties look similar to this
+
+```json
+{
+  "configurations": [
+    {
+      "name": "Linux",
+      "includePath": ["${workspaceFolder}/**"],
+      "defines": ["MG_ENABLE_CALLBACK_USERDATA"],
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "clang-x64"
+    }
+  ],
+  "version": 4
+}
+```
 
 [Outdated Tutorial](https://jamezrin.wordpress.com/2018/03/09/wake-on-lan-remotely-and-securely-with-esp8266)
