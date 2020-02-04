@@ -26,7 +26,12 @@ To flash this app you'll need:
    git clone --recursive https://github.com/jamezrin/mosmqtt_wakeonlan
    ```
 
-2. Run the flash script. If everything is fine, your device should be detected automatically and you should end up with a flashed device.
+2. Copy `.env.sample` to `.env` and edit it accordingly
+    - The `WIFI_SSID` and `WIFI_PSK` variables are your WiFi SSID and password respectively
+    - The `MQTT_CLIENT_ID`, `MQTT_USER` and `MQTT_PASS` variables can be obtained from https://losant.com/
+    - The `DASH_TOKEN` variable can be obtained from https://mdash.net/
+
+3. Run the flash script. If everything is fine, your device should be detected automatically and you should end up with a flashed device.
 
    ```bash
    ./reflash.sh
